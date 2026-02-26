@@ -128,13 +128,17 @@
         }
 
         .btn-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--red);
-            border: 1px solid var(--red);
-            padding: 0.6rem 1.2rem;
+            background: var(--red);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
             border-radius: 0.5rem;
-            font-weight: 800;
+            font-weight: 900;
             cursor: pointer;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
         }
 
         .priority-grid {
@@ -431,12 +435,23 @@
         }
 
         async function resetAllData() {
-            if (!confirm("&#9888;&#65039; PERMANENTLY WIPE ALL RESULTS?")) return;
-            if (!confirm("FINAL WARNING: This cannot be undone.")) return;
+            if (!confirm("🚨 PERMANENTLY WIPE ALL CANVASS RESULTS?")) return;
+            if (!confirm("FINAL WARNING: This will archive all current progress. Proceed?")) return;
+            
+            const btn = document.getElementById('reset-btn');
+            const oldText = btn.innerText;
+            btn.innerText = "WIPING DATA...";
+            btn.disabled = true;
+
             try {
                 await fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=archive');
+                alert("Success: All test data has been cleared!");
                 location.reload();
-            } catch (e) { alert("Reset failed."); }
+            } catch (e) { 
+                alert("Reset failed. Please check your connection."); 
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
         }
 
         function renderDashboard() {
