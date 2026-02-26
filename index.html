@@ -277,18 +277,36 @@
             try {
                 document.getElementById('sync-status').innerText = "Syncing with Cloud...";
 
-                const [r1, r2, r3] = await Promise.all([
-                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_voters'),
+                // Try to load static voter data first (faster/more reliable on GitHub)
+                let staticVoters = null;
+                try {
+                    const staticRes = await fetch('voter_data.json');
+                    if (staticRes.ok) staticVoters = await staticRes.json();
+                } catch (e) { console.warn("Static data load skipped"); }
+
+                const fetchPromises = [
                     fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=fetch'),
                     fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_priorities')
-                ]);
+                ];
 
-                masterData = await r1.json();
-                const results = await r2.json();
+                // Only fetch voters from Google if static load failed
+                if (!staticVoters) {
+                    fetchPromises.push(fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_voters'));
+                }
+
+                const responses = await Promise.all(fetchPromises);
+                const results = await responses[0].json();
                 cloudResults = {};
                 results.forEach(r => { cloudResults[r.Address] = r.Response || r.status; });
-                const pData = await r3.json();
+
+                const pData = await responses[1].json();
                 activePriorities = (pData.active || []).filter(x => x.trim() !== "");
+
+                if (staticVoters) {
+                    masterData = staticVoters;
+                } else {
+                    masterData = await responses[2].json();
+                }
 
                 renderDashboard();
                 renderPrioritySelector();
