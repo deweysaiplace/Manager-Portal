@@ -406,6 +406,28 @@
             } catch (e) { alert("Error deploying strategy."); }
         }
 
+        async function sendBroadcast() {
+            const input = document.getElementById('broadcast-input');
+            const msg = input.value.trim();
+            const btn = event.target;
+            const oldText = btn.innerText;
+            
+            if (!msg) return alert("Please enter a message.");
+            
+            btn.disabled = true;
+            btn.innerText = "SENDING...";
+            try {
+                await fetch(SYNC_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ action: 'set_broadcast', message: msg }) 
+                });
+                btn.innerText = "DEPLOYED!";
+                input.value = "";
+                setTimeout(() => { btn.innerText = oldText; btn.disabled = false; }, 2000);
+            } catch (e) { alert("Broadcast failed."); btn.disabled = false; }
+        }
+
         async function resetAllData() {
             if (!confirm("&#9888;&#65039; PERMANENTLY WIPE ALL RESULTS?")) return;
             if (!confirm("FINAL WARNING: This cannot be undone.")) return;
