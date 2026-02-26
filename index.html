@@ -205,7 +205,7 @@
     </header>
 
     <div class="card" style="margin-bottom: 2rem; border-color: var(--gold);">
-        <h2 style="font-weight: 900; color: var(--gold);">ðŸš¨ STRATEGIC OVERRIDE: PRIORITY DISTRICTS</h2>
+        <h2 style="font-weight: 900; color: var(--gold);">🚨 STRATEGIC OVERRIDE: PRIORITY DISTRICTS</h2>
         <p style="font-size: 0.8rem; color: var(--muted);">Select districts to activate "GO NOW" alerts for volunteers.
         </p>
         <div id="priority-selector" class="priority-grid">
@@ -246,21 +246,21 @@
     </div>
 
     <div class="card" style="margin-top: 1.5rem; border-color: var(--red);">
-        <h2 style="color: var(--red); margin-bottom: 0.5rem;">âš™ï¸ SYSTEM ADMIN</h2>
+        <h2 style="color: var(--red); margin-bottom: 0.5rem;">⚙️ SYSTEM ADMIN</h2>
         <button class="btn-danger" id="reset-btn" onclick="resetAllData()">WIPE ALL CANVASS DATA (HARD RESET)</button>
     </div>
 
     <script>
         // --- SYNC CONFIG & LOCAL TESTING ---
-        let SYNC_URL = '<?= scriptUrl ?>';
-        const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || SYNC_URL.startsWith('<?');
+        let SYNC_URL = 'https://script.google.com/macros/s/AKfycby-2Nt4CxNoNyAysZlZvko4VrqDyGaW7L34PLd20gyK-hftXhhJKBTQTr1KsN6949A7kQ/exec';
+        const isLocal = false;
 
         if (isLocal) {
             document.getElementById('dev-tag').classList.remove('hidden');
             const storedUrl = localStorage.getItem('v6_sync_url');
             if (storedUrl) SYNC_URL = storedUrl;
             else {
-                SYNC_URL = prompt("ðŸ› ï¸ DEV MODE (MANAGER): Please enter your Google Script 'Exec' URL to test locally:");
+                SYNC_URL = prompt("🛠️ DEV MODE (MANAGER): Please enter your Google Script 'Exec' URL to test locally:");
                 if (SYNC_URL) localStorage.setItem('v6_sync_url', SYNC_URL);
             }
         }
@@ -340,7 +340,7 @@
         }
 
         async function resetAllData() {
-            if (!confirm("âš ï¸ PERMANENTLY WIPE ALL RESULTS?")) return;
+            if (!confirm("⚠️ PERMANENTLY WIPE ALL RESULTS?")) return;
             if (!confirm("FINAL WARNING: This cannot be undone.")) return;
             try {
                 await fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=archive');
