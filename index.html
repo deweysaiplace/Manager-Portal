@@ -305,8 +305,13 @@
                 let rawVoters = null;
                 if (staticVoters) {
                     rawVoters = staticVoters;
-                } else {
+                } else if (responses[2]) {
                     rawVoters = await responses[2].json();
+                }
+
+                if (!rawVoters) {
+                    document.getElementById('sync-status').innerText = "Data Load Failed";
+                    return;
                 }
 
                 // Normalization: Flatten the nested City -> District -> Street -> Voter structure
