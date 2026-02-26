@@ -228,6 +228,15 @@
         <button class="btn-sync" style="margin-top: 1.5rem;" onclick="savePriorities()">DEPLOY STRATEGY</button>
     </div>
 
+    <div class="card" style="margin-bottom: 2rem; border-color: var(--forest);">
+        <h2 style="font-weight: 900; color: var(--forest);">&#128226; TEAM BROADCAST</h2>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem;">Send a scrolling message to all volunteer devices.</p>
+        <div style="display:flex; gap: 10px;">
+            <input type="text" id="broadcast-input" style="flex-grow:1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;" placeholder="Enter message here...">
+            <button class="btn-sync" style="background: var(--forest); min-width: 100px;" onclick="sendBroadcast()">SEND</button>
+        </div>
+    </div>
+
     <div class="grid">
         <div class="card">
             <div class="stat-label">Total Target Voters</div>
