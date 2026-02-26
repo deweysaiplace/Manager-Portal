@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Command: Strategic Overview</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --forest: #064e3b;
+            --gold: #f59e0b;
+            --card: #1e293b;
+            --bg: #0f172a;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --pink: #db2777;
+            --red: #ef4444;
+            --green: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-val {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--gold);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem;
+            color: var(--muted);
+            border-bottom: 1px solid #334155;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            font-size: 0.7rem;
+        }
+
+        .badge-yellow {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--gold);
+            border: 1px solid var(--gold);
+        }
+
+        .badge-pink {
+            background: rgba(219, 39, 119, 0.2);
+            color: var(--pink);
+            border: 1px solid var(--pink);
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+            border: 1px solid var(--red);
+        }
+
+        .btn-sync {
+            background: var(--gold);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--red);
+            border: 1px solid var(--red);
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .priority-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .priority-item {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .priority-item.active {
+            border-color: var(--gold);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #334155;
+        }
+
+        .priority-item.active .dot {
+            background: var(--gold);
+            box-shadow: 0 0 10px var(--gold);
+        }
+
+        .dev-badge {
+            background: var(--pink);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 950;
+            margin-right: 15px;
+        }
+    </style>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('SW registered'))
+                .catch(err => console.log('SW error:', err));
+            });
+        }
+    </script>
+</head>
+
+
+<body>
+
+    <header>
+        <div style="display:flex; align-items:center;">
+            <div id="dev-tag" class="dev-badge hidden">LOCAL TEST MODE</div>
+            <div>
+                <h1 style="font-weight: 900; letter-spacing: -1px; color: var(--gold);">MANAGER COMMAND CENTER</h1>
+                <p id="sync-status" style="font-size: 0.8rem; font-weight: 700; color: #4ade80;">Connecting...</p>
+            </div>
+        </div>
+        <button class="btn-sync" onclick="fetchData()">REFRESH CLOUD DATA</button>
+    </header>
+
+    <div class="card" style="margin-bottom: 2rem; border-color: var(--gold);">
+        <h2 style="font-weight: 900; color: var(--gold);">🚨 STRATEGIC OVERRIDE: PRIORITY DISTRICTS</h2>
+        <p style="font-size: 0.8rem; color: var(--muted);">Select districts to activate "GO NOW" alerts for volunteers.
+        </p>
+        <div id="priority-selector" class="priority-grid">
+            <!-- Dynamically populated -->
+        </div>
+        <button class="btn-sync" style="margin-top: 1.5rem;" onclick="savePriorities()">DEPLOY STRATEGY</button>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="stat-label">Total Target Voters</div>
+            <div class="stat-val" id="total-voters">0</div>
+        </div>
+        <div class="card">
+            <div class="stat-label">Overall Progress</div>
+            <div class="stat-val" id="progress-pct">0%</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem;">
+        <h2 style="margin-bottom: 1rem;">Live Field Status</h2>
+        <div style="max-height: 500px; overflow-y: auto;">
+            <table id="voter-table">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Precinct</th>
+                        <th>Name</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="voter-body">
+                    <!-- Data injected here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem; border-color: var(--red);">
+        <h2 style="color: var(--red); margin-bottom: 0.5rem;">⚙️ SYSTEM ADMIN</h2>
+        <button class="btn-danger" id="reset-btn" onclick="resetAllData()">WIPE ALL CANVASS DATA (HARD RESET)</button>
+    </div>
+
+    <script>
+        // --- SYNC CONFIG & LOCAL TESTING ---
+        let SYNC_URL = '<?= scriptUrl ?>';
+        const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || SYNC_URL.startsWith('<?');
+
+        if (isLocal) {
+            document.getElementById('dev-tag').classList.remove('hidden');
+            const storedUrl = localStorage.getItem('v6_sync_url');
+            if (storedUrl) SYNC_URL = storedUrl;
+            else {
+                SYNC_URL = prompt("🛠️ DEV MODE (MANAGER): Please enter your Google Script 'Exec' URL to test locally:");
+                if (SYNC_URL) localStorage.setItem('v6_sync_url', SYNC_URL);
+            }
+        }
+
+        let masterData = { flat: [], hierarchy: {} };
+        let cloudResults = {};
+        let activePriorities = [];
+
+        async function fetchData() {
+            if (!SYNC_URL || SYNC_URL.startsWith('<?')) {
+                document.getElementById('sync-status').innerText = "Config Required";
+                return;
+            }
+            try {
+                document.getElementById('sync-status').innerText = "Syncing with Cloud...";
+
+                const [r1, r2, r3] = await Promise.all([
+                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_voters'),
+                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=fetch'),
+                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_priorities')
+                ]);
+
+                masterData = await r1.json();
+                const results = await r2.json();
+                cloudResults = {};
+                results.forEach(r => { cloudResults[r.Address] = r.Response || r.status; });
+                const pData = await r3.json();
+                activePriorities = (pData.active || []).filter(x => x.trim() !== "");
+
+                renderDashboard();
+                renderPrioritySelector();
+                document.getElementById('sync-status').innerText = "Last Updated: " + new Date().toLocaleTimeString();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('sync-status').innerText = "Offline/Sync Error";
+            }
+        }
+
+        function renderPrioritySelector() {
+            const container = document.getElementById('priority-selector');
+            const districts = new Set();
+            Object.keys(masterData.hierarchy || {}).forEach(city => {
+                Object.keys(masterData.hierarchy[city] || {}).forEach(dist => districts.add(dist));
+            });
+
+            const sorted = Array.from(districts).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+            container.innerHTML = '';
+            sorted.forEach(d => {
+                const isActive = activePriorities.includes(d);
+                const el = document.createElement('div');
+                el.className = `priority-item ${isActive ? 'active' : ''}`;
+                el.innerHTML = `<span>Precinct ${d}</span> <div class="dot"></div>`;
+                el.onclick = () => {
+                    el.classList.toggle('active');
+                    if (el.classList.contains('active')) { if (!activePriorities.includes(d)) activePriorities.push(d); }
+                    else { activePriorities = activePriorities.filter(x => x !== d); }
+                };
+                container.appendChild(el);
+            });
+        }
+
+        async function savePriorities() {
+            try {
+                const btn = event.target;
+                const oldText = btn.innerText;
+                btn.innerText = "DEPLOYING..."; btn.disabled = true;
+
+                await fetch(SYNC_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'set_priorities', active: activePriorities })
+                });
+
+                btn.innerText = "STRATEGY DEPLOYED!";
+                setTimeout(() => { btn.innerText = oldText; btn.disabled = false; }, 2000);
+            } catch (e) { alert("Error deploying strategy."); }
+        }
+
+        async function resetAllData() {
+            if (!confirm("⚠️ PERMANENTLY WIPE ALL RESULTS?")) return;
+            if (!confirm("FINAL WARNING: This cannot be undone.")) return;
+            try {
+                await fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=archive');
+                location.reload();
+            } catch (e) { alert("Reset failed."); }
+        }
+
+        function renderDashboard() {
+            const flat = masterData.flat || [];
+            document.getElementById('total-voters').innerText = flat.length;
+
+            const tableBody = document.getElementById('voter-body');
+            tableBody.innerHTML = '';
+
+            let completed = 0;
+            flat.forEach(v => {
+                const status = cloudResults[v.Address] || 'UNVISITED';
+                if (status !== 'UNVISITED') completed++;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${v.Address}</td>
+                    <td style="font-weight:700;">${v.District || '---'}</td>
+                    <td>${v.Name}</td>
+                    <td><span class="badge badge-${v.Priority.toLowerCase()}">${v.Priority}</span></td>
+                    <td style="font-weight:800; color:${status === 'UNVISITED' ? 'var(--muted)' : 'var(--gold)'}">${status}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            const pct = flat.length > 0 ? ((completed / flat.length) * 100).toFixed(1) : 0;
+            document.getElementById('progress-pct').innerText = pct + '%';
+        }
+
+        fetchData();
+        setInterval(fetchData, 60000);
+    </script>
+</body>
+
+</html>
