@@ -177,15 +177,44 @@
         }
 
         @media (max-width: 768px) {
-            body { padding: 1rem; }
-            header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-            .btn-sync { width: 100%; }
-            .stat-val { font-size: 2rem; }
-            .grid { grid-template-columns: 1fr; }
-            .card { padding: 1rem; }
-            .priority-grid { grid-template-columns: 1fr 1fr; }
-            table { font-size: 0.8rem; }
-            th, td { padding: 0.5rem; }
+            body {
+                padding: 1rem;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .btn-sync {
+                width: 100%;
+            }
+
+            .stat-val {
+                font-size: 2rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .priority-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th,
+            td {
+                padding: 0.5rem;
+            }
         }
 
         .table-wrapper {
@@ -236,10 +265,14 @@
 
     <div class="card" style="margin-bottom: 2rem; border-color: var(--forest);">
         <h2 style="font-weight: 900; color: var(--forest);">&#128226; TEAM BROADCAST</h2>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem;">Send a scrolling message to all volunteer devices.</p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem;">Send a scrolling message to all
+            volunteer devices.</p>
         <div style="display:flex; gap: 10px;">
-            <input type="text" id="broadcast-input" style="flex-grow:1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;" placeholder="Enter message here...">
-            <button class="btn-sync" style="background: var(--forest); min-width: 100px;" onclick="sendBroadcast()">SEND</button>
+            <input type="text" id="broadcast-input"
+                style="flex-grow:1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;"
+                placeholder="Enter message here...">
+            <button class="btn-sync" style="background: var(--forest); min-width: 100px;"
+                onclick="sendBroadcast()">SEND</button>
         </div>
     </div>
 
@@ -309,33 +342,44 @@
                 // Try to load static voter data first (faster/more reliable on GitHub)
                 let staticVoters = null;
                 try {
-                    const staticRes = await fetch('voter_data.json');
+                    const staticRes = await fetch('voter_data_full.json');
                     if (staticRes.ok) staticVoters = await staticRes.json();
                 } catch (e) { console.warn("Static data load skipped"); }
 
                 const fetchPromises = [
-                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=fetch'),
-                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_priorities')
+                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=fetch').catch(e => null),
+                    fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_priorities').catch(e => null)
                 ];
 
                 // Only fetch voters from Google if static load failed
                 if (!staticVoters) {
-                    fetchPromises.push(fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_voters'));
+                    fetchPromises.push(fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=get_voters').catch(e => null));
                 }
 
                 const responses = await Promise.all(fetchPromises);
-                const results = await responses[0].json();
-                cloudResults = {};
-                results.forEach(r => { cloudResults[r.Address] = r.Response || r.status; });
 
-                const pData = await responses[1].json();
-                activePriorities = (pData.active || []).filter(x => x.trim() !== "");
+                cloudResults = {};
+                if (responses[0] && responses[0].ok) {
+                    try {
+                        const results = await responses[0].json();
+                        results.forEach(r => { cloudResults[r.Address] = r.Response || r.status; });
+                    } catch (e) { console.error(e); }
+                }
+
+                if (responses[1] && responses[1].ok) {
+                    try {
+                        const pData = await responses[1].json();
+                        activePriorities = (pData.active || []).filter(x => x.trim() !== "");
+                    } catch (e) { console.error(e); }
+                }
 
                 let rawVoters = null;
                 if (staticVoters) {
                     rawVoters = staticVoters;
-                } else if (responses[2]) {
-                    rawVoters = await responses[2].json();
+                } else if (responses[2] && responses[2].ok) {
+                    try {
+                        rawVoters = await responses[2].json();
+                    } catch (e) { console.error(e); }
                 }
 
                 if (!rawVoters) {
@@ -365,6 +409,8 @@
                             }
                         }
                     }
+                    // Yield to browser UI thread after each city to prevent freeze
+                    await new Promise(r => setTimeout(r, 0));
                 }
                 masterData.hierarchy = rawVoters;
 
@@ -403,7 +449,8 @@
 
                 await fetch(SYNC_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    cache: 'no-cache',
                     body: JSON.stringify({ action: 'set_priorities', active: activePriorities })
                 });
 
@@ -417,16 +464,17 @@
             const msg = input.value.trim();
             const btn = event.target;
             const oldText = btn.innerText;
-            
+
             if (!msg) return alert("Please enter a message.");
-            
+
             btn.disabled = true;
             btn.innerText = "SENDING...";
             try {
-                await fetch(SYNC_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    body: JSON.stringify({ action: 'set_broadcast', message: msg }) 
+                await fetch(SYNC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    cache: 'no-cache',
+                    body: JSON.stringify({ action: 'set_broadcast', message: msg })
                 });
                 btn.innerText = "DEPLOYED!";
                 input.value = "";
@@ -437,7 +485,7 @@
         async function resetAllData() {
             if (!confirm("🚨 PERMANENTLY WIPE ALL CANVASS RESULTS?")) return;
             if (!confirm("FINAL WARNING: This will archive all current progress. Proceed?")) return;
-            
+
             const btn = document.getElementById('reset-btn');
             const oldText = btn.innerText;
             btn.innerText = "WIPING DATA...";
@@ -447,8 +495,8 @@
                 await fetch(SYNC_URL + (SYNC_URL.includes('?') ? '&' : '?') + 'action=archive');
                 alert("Success: All test data has been cleared!");
                 location.reload();
-            } catch (e) { 
-                alert("Reset failed. Please check your connection."); 
+            } catch (e) {
+                alert("Reset failed. Please check your connection.");
                 btn.innerText = oldText;
                 btn.disabled = false;
             }
@@ -491,4 +539,5 @@
         setInterval(fetchData, 60000);
     </script>
 </body>
+
 </html>
