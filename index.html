@@ -288,7 +288,11 @@
     </div>
 
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 style="margin-bottom: 1rem;">Live Field Status</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h2 style="margin:0;">Live Field Status</h2>
+            <button class="btn-sync" style="background:var(--forest); min-width:auto; padding:0.5rem 1rem;"
+                onclick="exportDataCSV()">EXPORT CSV</button>
+        </div>
         <div class="table-wrapper">
             <table id="voter-table">
                 <thead>
@@ -359,10 +363,14 @@
                 const responses = await Promise.all(fetchPromises);
 
                 cloudResults = {};
+                window.cloudDetailedResults = {};
                 if (responses[0] && responses[0].ok) {
                     try {
                         const results = await responses[0].json();
-                        results.forEach(r => { cloudResults[r.Address] = r.Response || r.status; });
+                        results.forEach(r => {
+                            cloudResults[r.Address] = r.Response || r.status;
+                            window.cloudDetailedResults[r.Address] = r;
+                        });
                     } catch (e) { console.error(e); }
                 }
 
@@ -483,6 +491,11 @@
         }
 
         async function resetAllData() {
+            const pwd = prompt("Enter Admin Password to execute wipe:");
+            if (pwd !== "2026") {
+                alert("Incorrect password. Wipe cancelled.");
+                return;
+            }
             if (!confirm("🚨 PERMANENTLY WIPE ALL CANVASS RESULTS?")) return;
             if (!confirm("FINAL WARNING: This will archive all current progress. Proceed?")) return;
 
@@ -500,6 +513,40 @@
                 btn.innerText = oldText;
                 btn.disabled = false;
             }
+        }
+
+        function exportDataCSV() {
+            const flat = masterData.flat || [];
+            let csvContent = "Address,District,Name,Priority,Status,Notes,Volunteer,Timestamp\n";
+
+            flat.forEach(v => {
+                const detail = window.cloudDetailedResults[v.Address] || {};
+                const status = cloudResults[v.Address] || 'UNVISITED';
+                const notes = detail.Notes ? String(detail.Notes).replace(/"/g, '""') : '';
+                const vol = detail.Volunteer || '';
+                const ts = detail.Timestamp || '';
+
+                const row = [
+                    `"${v.Address}"`,
+                    `"${v.District || ''}"`,
+                    `"${v.Name}"`,
+                    `"${v.Priority}"`,
+                    `"${status}"`,
+                    `"${notes}"`,
+                    `"${vol}"`,
+                    `"${ts}"`
+                ].join(",");
+                csvContent += row + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Campaign_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function renderDashboard() {
