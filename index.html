@@ -290,18 +290,23 @@
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <h2 style="margin:0;">Live Field Status</h2>
-            <button class="btn-sync" style="background:var(--forest); min-width:auto; padding:0.5rem 1rem;"
-                onclick="exportDataCSV()">EXPORT CSV</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-sync"
+                    style="background:var(--accent); color:var(--primary); min-width:auto; padding:0.5rem 1rem;"
+                    onclick="generateRouteReport()">ROUTE REPORT</button>
+                <button class="btn-sync" style="background:var(--forest); min-width:auto; padding:0.5rem 1rem;"
+                    onclick="exportDataCSV()">EXPORT CSV</button>
+            </div>
         </div>
         <div class="table-wrapper">
             <table id="voter-table">
                 <thead>
                     <tr>
                         <th>Address</th>
-                        <th>Precinct</th>
                         <th>Name</th>
-                        <th>Priority</th>
                         <th>Status</th>
+                        <th>Notes</th>
+                        <th>Volunteer</th>
                     </tr>
                 </thead>
                 <tbody id="voter-body">
@@ -549,6 +554,65 @@
             document.body.removeChild(link);
         }
 
+        function generateRouteReport() {
+            const city = prompt("Enter City Name for Report (e.g., Tullahoma or Manchester):");
+            if (!city) return;
+
+            // Search with loose casing
+            const cityKey = Object.keys(masterData.hierarchy).find(k => k.toLowerCase() === city.toLowerCase());
+            if (!cityKey) return alert("City not found in database.");
+
+            const cityData = masterData.hierarchy[cityKey];
+            let streetStats = [];
+
+            for (const district in cityData) {
+                for (const street in cityData[district]) {
+                    const voters = cityData[district][street];
+                    let totalTargets = 0;
+                    let untouchedTargets = 0;
+
+                    voters.forEach(v => {
+                        const isTarget = (v.Priority === 'Red' || v.Priority === 'Pink');
+                        if (isTarget) {
+                            totalTargets++;
+                            const status = cloudResults[(v.a || v.Address) + ' ' + street] || cloudResults[(v.a || v.Address)] || 'UNVISITED';
+                            if (status === 'UNVISITED') untouchedTargets++;
+                        }
+                    });
+
+                    if (untouchedTargets > 0) {
+                        streetStats.push({
+                            street: street,
+                            district: district,
+                            targets: untouchedTargets
+                        });
+                    }
+                }
+            }
+
+            streetStats.sort((a, b) => b.targets - a.targets);
+            const top = streetStats.slice(0, 20);
+
+            if (top.length === 0) return alert('No priority targets remain untouched in this city!');
+
+            let report = `🔥 TOP PRIORITY UNFINISHED ROUTES: ${cityKey.toUpperCase()} 🔥\n`;
+            report += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+            top.forEach((s, idx) => {
+                report += `${idx + 1}. ${s.street.toUpperCase()} (Precinct ${s.district}) -> ${s.targets} Target Voters remaining\n`;
+            });
+
+            // Auto-download as text file
+            const blob = new Blob([report], { type: 'text/plain;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${cityKey}_Route_Report.txt`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         function renderDashboard() {
             const flat = masterData.flat || [];
             document.getElementById('total-voters').innerText = flat.length;
@@ -557,16 +621,35 @@
             tableBody.innerHTML = '';
 
             let completed = 0;
+            const visitedVoters = [];
+
             flat.forEach(v => {
                 const status = cloudResults[v.Address] || 'UNVISITED';
-                if (status !== 'UNVISITED') completed++;
+                if (status !== 'UNVISITED') {
+                    completed++;
+                    visitedVoters.push(v);
+                }
+            });
+
+            // Sort visited by latest timestamp
+            visitedVoters.sort((a, b) => {
+                const tA = window.cloudDetailedResults[a.Address]?.Timestamp || '';
+                const tB = window.cloudDetailedResults[b.Address]?.Timestamp || '';
+                return tB.localeCompare(tA);
+            });
+
+            // Render top 150 recent touches
+            visitedVoters.slice(0, 150).forEach(v => {
+                const status = cloudResults[v.Address];
+                const detail = window.cloudDetailedResults[v.Address] || {};
+                const notes = detail.Notes ? String(detail.Notes).replace(/</g, "&lt;").substring(0, 60) : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${v.Address}</td>
-                    <td style="font-weight:700;">${v.District || '---'}</td>
+                    <td style="font-weight:700;">${v.Address}</td>
                     <td>${v.Name}</td>
-                    <td><span class="badge badge-${v.Priority.toLowerCase()}">${v.Priority}</span></td>
-                    <td style="font-weight:800; color:${status === 'UNVISITED' ? 'var(--muted)' : 'var(--gold)'}">${status}</td>
+                    <td style="font-weight:800; color:var(--gold); font-size:0.7rem;">${status}</td>
+                    <td style="font-size:0.75rem; color:var(--muted); font-style:italic;">${notes}</td>
+                    <td style="font-size:0.7rem; color:var(--text);">${detail.Volunteer || ''}</td>
                 `;
                 tableBody.appendChild(row);
             });
