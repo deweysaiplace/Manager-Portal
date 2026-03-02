@@ -414,7 +414,9 @@
                                 voters.forEach(v => {
                                     masterData.flat.push({
                                         Address: v.a || v.Address,
+                                        City: city,
                                         District: district,
+                                        Street: street,
                                         Name: `${v.fn} ${v.ln}`,
                                         Priority: v.c || v.Priority
                                     });
@@ -555,45 +557,38 @@
         }
 
         function generateRouteReport() {
-            const city = prompt("Enter City Name for Report (e.g., Tullahoma or Manchester):");
-            if (!city) return;
+            const cities = Object.keys(masterData.hierarchy || {});
+            if (cities.length === 0) return alert("System still loading data...");
+            const sel = document.getElementById('route-city-select');
+            sel.innerHTML = cities.map(c => `<option value="${c}">${c.toUpperCase()}</option>`).join('');
+            document.getElementById('route-modal').classList.remove('hidden');
+        }
 
-            // Search with loose casing
-            const cityKey = Object.keys(masterData.hierarchy).find(k => k.toLowerCase() === city.toLowerCase());
-            if (!cityKey) return alert("City not found in database.");
+        function executeRouteReport() {
+            const cityKey = document.getElementById('route-city-select').value;
+            document.getElementById('route-modal').classList.add('hidden');
 
-            const cityData = masterData.hierarchy[cityKey];
-            let streetStats = [];
+            const flat = masterData.flat || [];
+            const streetStats = {};
 
-            for (const district in cityData) {
-                for (const street in cityData[district]) {
-                    const voters = cityData[district][street];
-                    let totalTargets = 0;
-                    let untouchedTargets = 0;
-
-                    voters.forEach(v => {
-                        const isTarget = (v.Priority === 'Red' || v.Priority === 'Pink');
-                        if (isTarget) {
-                            totalTargets++;
-                            const status = cloudResults[(v.a || v.Address) + ' ' + street] || cloudResults[(v.a || v.Address)] || 'UNVISITED';
-                            if (status === 'UNVISITED') untouchedTargets++;
+            flat.forEach(v => {
+                // Ensure loose casing matches the newly captured v.City attribute
+                if (v.City.toLowerCase() === cityKey.toLowerCase()) {
+                    const isTarget = (v.Priority === 'Red' || v.Priority === 'Pink');
+                    if (isTarget) {
+                        const status = cloudResults[v.Address] || 'UNVISITED';
+                        if (status === 'UNVISITED') {
+                            const key = v.Street + '|' + v.District;
+                            if (!streetStats[key]) streetStats[key] = { street: v.Street, district: v.District, targets: 0 };
+                            streetStats[key].targets++;
                         }
-                    });
-
-                    if (untouchedTargets > 0) {
-                        streetStats.push({
-                            street: street,
-                            district: district,
-                            targets: untouchedTargets
-                        });
                     }
                 }
-            }
+            });
 
-            streetStats.sort((a, b) => b.targets - a.targets);
-            const top = streetStats.slice(0, 20);
+            const top = Object.values(streetStats).sort((a, b) => b.targets - a.targets).slice(0, 20);
 
-            if (top.length === 0) return alert('No priority targets remain untouched in this city!');
+            if (top.length === 0) return alert(`No priority targets remain untouched in ${cityKey}!`);
 
             let report = `🔥 TOP PRIORITY UNFINISHED ROUTES: ${cityKey.toUpperCase()} 🔥\n`;
             report += `Generated: ${new Date().toLocaleString()}\n\n`;
@@ -602,7 +597,6 @@
                 report += `${idx + 1}. ${s.street.toUpperCase()} (Precinct ${s.district}) -> ${s.targets} Target Voters remaining\n`;
             });
 
-            // Auto-download as text file
             const blob = new Blob([report], { type: 'text/plain;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
@@ -668,6 +662,27 @@
         fetchData();
         setInterval(fetchData, 60000);
     </script>
+
+    <!-- Route Report Modal -->
+    <div id="route-modal" class="hidden"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center;">
+        <div
+            style="background:var(--card); padding:2rem; border-radius:1rem; border:1px solid var(--border); width:90%; max-width:400px; text-align:center;">
+            <h3 style="margin-bottom:0.5rem; color:var(--text);">Generate Route Report</h3>
+            <p style="margin-bottom:1.5rem; font-size:0.9rem; color:var(--muted);">Select a city below to calculate the
+                highest density target routes.</p>
+            <select id="route-city-select"
+                style="width:100%; padding:0.8rem; border-radius:0.5rem; background:var(--bg); color:var(--text); border:1px solid #334155; margin-bottom:1.5rem; font-size:1rem;">
+            </select>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-home" style="flex:1;"
+                    onclick="document.getElementById('route-modal').classList.add('hidden')">CANCEL</button>
+                <button class="btn-gold"
+                    style="flex:1; background:var(--forest); border-color:var(--forest); color:white;"
+                    onclick="executeRouteReport()">GENERATE</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
