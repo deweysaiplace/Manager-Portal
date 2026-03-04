@@ -850,29 +850,31 @@
             const flat = masterData.flat || [];
             const unvisited = flat.filter(v => (cloudResults[v.Address] || 'UNVISITED') === 'UNVISITED');
 
-            let cityStreetStats = {};
+            let streetStats = {};
             unvisited.forEach(v => {
                 const c = (v.City || 'Unknown').trim().toUpperCase();
                 const s = (v.Street || 'Unknown').trim().toUpperCase();
-                if (!cityStreetStats[c]) cityStreetStats[c] = {};
-                cityStreetStats[c][s] = (cityStreetStats[c][s] || 0) + 1;
+                const key = `${s} (${c})`;
+                streetStats[key] = (streetStats[key] || 0) + 1;
             });
 
-            let contextData = "Current Target Status:\n";
-            for (let c in cityStreetStats) {
-                contextData += `[${c}]\n`;
-                for (let s in cityStreetStats[c]) {
-                    contextData += `- ${s}: ${cityStreetStats[c][s]} homes left\n`;
-                }
-            }
+            // Avoid token limits by only sending top 150 streets
+            const sortedStreets = Object.entries(streetStats)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 150);
 
-            const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.\nData Context (Streets with unvisited homes):\n${contextData}\nDirectly answer the manager's query clearly and concisely based on this data.`;
+            let contextData = "Top 150 Streets with most unvisited targets:\n";
+            sortedStreets.forEach(([street, count]) => {
+                contextData += `- ${street}: ${count} homes left\n`;
+            });
+
+            const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.\nData Context for largest streets:\n${contextData}\nDirectly answer the manager's query clearly and concisely based on this data. If the street isn't listed, state that it must have very few or no targets left.`;
 
             try {
                 // Attempt Groq API call
                 const url = `https://api.groq.com/openai/v1/chat/completions`;
                 const payload = {
-                    model: "llama-3.3-70b-versatile", // Using Llama 3.3 70B for fast inference
+                    model: "llama-3.1-8b-instant", // High speed, high limit free model
                     messages: [
                         { role: "system", content: sysPrompt },
                         { role: "user", content: `Manager says: ${text}` }
