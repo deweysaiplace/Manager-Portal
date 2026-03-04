@@ -802,7 +802,7 @@
         }
 
         function setAIKey() {
-            const key = prompt("Enter your Google Gemini API Key (It will be saved locally to your device):", AI_API_KEY);
+            const key = prompt("Enter your Google Gemini API Key. (Get a free one at https://aistudio.google.com/app/apikey) \nIt will be saved locally and securely to your device:", AI_API_KEY);
             if (key !== null) {
                 AI_API_KEY = key.trim();
                 localStorage.setItem('campaign_ai_key', AI_API_KEY);
@@ -848,8 +848,25 @@
 
             // Context generation
             const flat = masterData.flat || [];
-            const remaining = document.getElementById('target-count') ? document.getElementById('target-count').innerText : "0";
-            const sysPrompt = `You are an AI Campaign Assistant for a political manager. Current stats: ${flat.length} total targets, ${remaining} currently filtered targeting. Be concise and helpful.`;
+            const unvisited = flat.filter(v => (cloudResults[v.Address] || 'UNVISITED') === 'UNVISITED');
+
+            let cityStreetStats = {};
+            unvisited.forEach(v => {
+                const c = (v.City || 'Unknown').trim().toUpperCase();
+                const s = (v.Street || 'Unknown').trim().toUpperCase();
+                if (!cityStreetStats[c]) cityStreetStats[c] = {};
+                cityStreetStats[c][s] = (cityStreetStats[c][s] || 0) + 1;
+            });
+
+            let contextData = "Current Target Status:\n";
+            for (let c in cityStreetStats) {
+                contextData += `[${c}]\n`;
+                for (let s in cityStreetStats[c]) {
+                    contextData += `- ${s}: ${cityStreetStats[c][s]} homes left\n`;
+                }
+            }
+
+            const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.\nData Context (Streets with unvisited homes):\n${contextData}\nDirectly answer the manager's query clearly and concisely based on this data.`;
 
             try {
                 // Attempt Gemini API call by default
@@ -865,7 +882,9 @@
                 });
 
                 if (!res.ok) {
-                    throw new Error("HTTP error " + res.status);
+                    const errorData = await res.json().catch(() => ({}));
+                    const errMsg = (errorData.error && errorData.error.message) ? errorData.error.message : `HTTP error ${res.status}`;
+                    throw new Error(errMsg);
                 }
 
                 const data = await res.json();
@@ -876,8 +895,14 @@
                 appendAIMessage(formattedReply, 'ai');
 
             } catch (err) {
-                console.error(err);
-                appendAIMessage("System: Error connecting to AI. Please verify your API Key is correct.", 'system');
+                console.error("AI Error:", err);
+                if (err.message.includes("API_KEY_INVALID") || err.message.includes("400")) {
+                    appendAIMessage("System: Google Gemini says the API Key is invalid. Make sure it was copied exactly with no extra spaces.", 'system');
+                } else if (err.message.includes("fetch")) {
+                    appendAIMessage("System: Network error reaching Google AI. Please check your internet connection.", 'system');
+                } else {
+                    appendAIMessage(`System: Error connecting to AI. (${err.message})`, 'system');
+                }
             } finally {
                 sendBtn.innerText = 'SEND';
                 sendBtn.disabled = false;
