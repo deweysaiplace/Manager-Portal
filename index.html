@@ -872,7 +872,7 @@
                 // Attempt Groq API call
                 const url = `https://api.groq.com/openai/v1/chat/completions`;
                 const payload = {
-                    model: "llama3-8b-8192", // Using Llama 3 8B for fast, free inference
+                    model: "llama-3.3-70b-versatile", // Using Llama 3.3 70B for fast inference
                     messages: [
                         { role: "system", content: sysPrompt },
                         { role: "user", content: `Manager says: ${text}` }
