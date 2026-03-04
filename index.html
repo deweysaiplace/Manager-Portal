@@ -792,21 +792,21 @@
         }
 
         /* --- AI ASSISTANT HARDWIRED SECTION --- */
-        let AI_API_KEY = localStorage.getItem('campaign_ai_key') || '';
+        let AI_API_KEY = localStorage.getItem('campaign_groq_key') || '';
 
         function toggleAIModal() {
             document.getElementById('ai-modal').classList.toggle('hidden');
             if (!AI_API_KEY) {
-                appendAIMessage("System: To hard-wire the AI so you never have to log in, please click 'Set API Key' to enter your Google Gemini API Key just once.", 'system');
+                appendAIMessage("System: To hard-wire the AI so you never have to log in, please click 'Set API Key' to enter your Groq API Key just once.", 'system');
             }
         }
 
         function setAIKey() {
-            const key = prompt("Enter your Google Gemini API Key. (Get a free one at https://aistudio.google.com/app/apikey) \nIt will be saved locally and securely to your device:", AI_API_KEY);
+            const key = prompt("Enter your Groq API Key (Starts with 'gsk_...'). \nYou can get a free one at https://console.groq.com/keys :", AI_API_KEY);
             if (key !== null) {
                 AI_API_KEY = key.trim();
-                localStorage.setItem('campaign_ai_key', AI_API_KEY);
-                appendAIMessage("System: Key saved! The AI is now hard-wired to your account.", 'system');
+                localStorage.setItem('campaign_groq_key', AI_API_KEY);
+                appendAIMessage("System: Groq Key saved! The AI is now hard-wired to your account.", 'system');
             }
         }
 
@@ -869,15 +869,22 @@
             const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.\nData Context (Streets with unvisited homes):\n${contextData}\nDirectly answer the manager's query clearly and concisely based on this data.`;
 
             try {
-                // Attempt Gemini API call by default
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${AI_API_KEY}`;
+                // Attempt Groq API call
+                const url = `https://api.groq.com/openai/v1/chat/completions`;
                 const payload = {
-                    contents: [{ role: "user", parts: [{ text: `${sysPrompt}\n\nManager says: ${text}` }] }]
+                    model: "llama3-8b-8192", // Using Llama 3 8B for fast, free inference
+                    messages: [
+                        { role: "system", content: sysPrompt },
+                        { role: "user", content: `Manager says: ${text}` }
+                    ]
                 };
 
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${AI_API_KEY}`
+                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -888,7 +895,7 @@
                 }
 
                 const data = await res.json();
-                const reply = data.candidates[0].content.parts[0].text;
+                const reply = data.choices[0].message.content;
 
                 // Parse markdown bold **text** to <strong>
                 const formattedReply = reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -896,10 +903,10 @@
 
             } catch (err) {
                 console.error("AI Error:", err);
-                if (err.message.includes("API_KEY_INVALID") || err.message.includes("400")) {
-                    appendAIMessage("System: Google Gemini says the API Key is invalid. Make sure it was copied exactly with no extra spaces.", 'system');
+                if (err.message.includes("api_key") || err.message.includes("401")) {
+                    appendAIMessage("System: Groq rejected the API Key. Make sure it starts with 'gsk_' and has no extra spaces.", 'system');
                 } else if (err.message.includes("fetch")) {
-                    appendAIMessage("System: Network error reaching Google AI. Please check your internet connection.", 'system');
+                    appendAIMessage("System: Network error reaching Groq API. Please check your internet connection.", 'system');
                 } else {
                     appendAIMessage(`System: Error connecting to AI. (${err.message})`, 'system');
                 }
