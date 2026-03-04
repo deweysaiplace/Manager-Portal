@@ -291,6 +291,44 @@
         </div>
     </div>
 
+    <!-- REMAINING TARGETS SEARCH -->
+    <div class="card" style="margin-top: 1.5rem; border-color: #3b82f6;">
+        <h2 style="font-weight: 900; color: #3b82f6; margin-bottom: 1rem;">&#128269; REMAINING TARGETS SEARCH</h2>
+        <div style="display:flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;">
+            <input type="text" id="target-search-input" oninput="updateTargetSearchResults()"
+                placeholder="Search address, name..."
+                style="flex:1; min-width: 200px; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;">
+            <select id="target-city-filter" onchange="updateTargetSearchResults()"
+                style="padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;">
+                <option value="">All Cities</option>
+            </select>
+            <select id="target-district-filter" onchange="updateTargetSearchResults()"
+                style="padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;">
+                <option value="">All Precincts</option>
+            </select>
+        </div>
+        <div style="margin-bottom: 1rem; font-size: 1.2rem; font-weight: bold;">
+            <span style="color: var(--muted);">Houses Left: </span><span id="target-count"
+                style="color: white;">0</span>
+        </div>
+        <div class="table-wrapper" style="max-height: 300px;">
+            <table id="target-table">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>City</th>
+                        <th>Precinct</th>
+                        <th>Name</th>
+                        <th>Priority</th>
+                    </tr>
+                </thead>
+                <tbody id="target-body">
+                    <!-- Targeted search data -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <h2 style="margin:0;">Live Field Status</h2>
@@ -434,6 +472,7 @@
                 masterData.hierarchy = rawVoters;
 
                 renderDashboard();
+                renderTargetSearch();
                 renderPrioritySelector(Array.from(districts));
                 document.getElementById('sync-status').innerText = "Last Updated: " + new Date().toLocaleTimeString();
             } catch (e) {
@@ -663,6 +702,188 @@
             });
         }
 
+        function renderTargetSearch() {
+            const flat = masterData.flat || [];
+
+            const citySelect = document.getElementById('target-city-filter');
+            const distSelect = document.getElementById('target-district-filter');
+
+            const currentCity = citySelect.value;
+            const currentDist = distSelect.value;
+
+            const cities = new Set();
+            const districts = new Set();
+
+            flat.forEach(v => {
+                const status = cloudResults[v.Address] || 'UNVISITED';
+                if (status === 'UNVISITED') {
+                    if (v.City) cities.add(v.City.trim().toUpperCase());
+                    if (v.District) districts.add(v.District);
+                }
+            });
+
+            citySelect.innerHTML = '<option value="">All Cities</option>';
+            Array.from(cities).sort().forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.innerText = c;
+                citySelect.appendChild(opt);
+            });
+            citySelect.value = currentCity;
+
+            distSelect.innerHTML = '<option value="">All Precincts</option>';
+            Array.from(districts).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0)).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.innerText = 'Precinct ' + d;
+                distSelect.appendChild(opt);
+            });
+            distSelect.value = currentDist;
+
+            updateTargetSearchResults();
+        }
+
+        function updateTargetSearchResults() {
+            const flat = masterData.flat || [];
+            const searchVal = document.getElementById('target-search-input').value.toLowerCase();
+            const cityVal = document.getElementById('target-city-filter').value;
+            const distVal = document.getElementById('target-district-filter').value;
+
+            const tableBody = document.getElementById('target-body');
+            tableBody.innerHTML = '';
+
+            let count = 0;
+            const maxDisplay = 200;
+
+            flat.forEach(v => {
+                const status = cloudResults[v.Address] || 'UNVISITED';
+                if (status !== 'UNVISITED') return;
+
+                const vCity = (v.City || '').trim().toUpperCase();
+                if (cityVal && vCity !== cityVal) return;
+
+                const vDist = v.District || '';
+                if (distVal && vDist !== distVal) return;
+
+                const nameStr = v.Name || '';
+                const addrStr = v.Address || '';
+                const searchStr = `${addrStr} ${nameStr}`.toLowerCase();
+                if (searchVal && !searchStr.includes(searchVal)) return;
+
+                count++;
+
+                if (count <= maxDisplay) {
+                    const row = document.createElement('tr');
+                    let pBadge = v.Priority;
+                    if (v.Priority === 'Red') pBadge = `<span class="badge badge-red">Red</span>`;
+                    else if (v.Priority === 'Pink') pBadge = `<span class="badge badge-pink">Pink</span>`;
+                    else if (v.Priority === 'Yellow') pBadge = `<span class="badge badge-yellow">Yellow</span>`;
+
+                    row.innerHTML = `
+                        <td style="font-weight:700;">${v.Address}</td>
+                        <td style="font-size: 0.8rem;">${vCity}</td>
+                        <td style="font-size: 0.8rem;">${vDist}</td>
+                        <td style="font-size: 0.8rem;">${nameStr}</td>
+                        <td>${pBadge}</td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+            });
+
+            document.getElementById('target-count').innerText = count;
+        }
+
+        /* --- AI ASSISTANT HARDWIRED SECTION --- */
+        let AI_API_KEY = localStorage.getItem('campaign_ai_key') || '';
+
+        function toggleAIModal() {
+            document.getElementById('ai-modal').classList.toggle('hidden');
+            if (!AI_API_KEY) {
+                appendAIMessage("System: To hard-wire the AI so you never have to log in, please click 'Set API Key' to enter your Google Gemini API Key just once.", 'system');
+            }
+        }
+
+        function setAIKey() {
+            const key = prompt("Enter your Google Gemini API Key (It will be saved locally to your device):", AI_API_KEY);
+            if (key !== null) {
+                AI_API_KEY = key.trim();
+                localStorage.setItem('campaign_ai_key', AI_API_KEY);
+                appendAIMessage("System: Key saved! The AI is now hard-wired to your account.", 'system');
+            }
+        }
+
+        function appendAIMessage(text, sender) {
+            const chatBody = document.getElementById('ai-chat-body');
+            const msgDiv = document.createElement('div');
+
+            if (sender === 'user') {
+                msgDiv.style = "background: #3b82f6; color: white; padding: 0.8rem 1rem; border-radius: 0.5rem; align-self: flex-end; max-width: 85%; font-size: 0.9rem;";
+                msgDiv.innerText = text;
+            } else if (sender === 'system') {
+                msgDiv.style = "background: rgba(245, 158, 11, 0.1); color: var(--gold); padding: 0.8rem 1rem; border-radius: 0.5rem; border: 1px solid var(--gold); align-self: center; width: 100%; font-size: 0.8rem; text-align: center;";
+                msgDiv.innerHTML = text;
+            } else {
+                msgDiv.style = "background: #1e293b; color: #f8fafc; padding: 0.8rem 1rem; border-radius: 0.5rem; align-self: flex-start; max-width: 85%; border: 1px solid #334155; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap;";
+                msgDiv.innerHTML = text; // allow bold/html
+            }
+
+            chatBody.appendChild(msgDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        async function sendAIMessage() {
+            const input = document.getElementById('ai-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendAIMessage(text, 'user');
+            input.value = '';
+
+            if (!AI_API_KEY) {
+                appendAIMessage("System: API Key is missing. Click 'Set API Key' to hard-wire the connection.", 'system');
+                return;
+            }
+
+            const sendBtn = document.getElementById('ai-send-btn');
+            sendBtn.innerText = '...';
+            sendBtn.disabled = true;
+
+            // Context generation
+            const flat = masterData.flat || [];
+            const remaining = document.getElementById('target-count') ? document.getElementById('target-count').innerText : "0";
+            const sysPrompt = `You are an AI Campaign Assistant for a political manager. Current stats: ${flat.length} total targets, ${remaining} currently filtered targeting. Be concise and helpful.`;
+
+            try {
+                // Attempt Gemini API call by default
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`;
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: `${sysPrompt}\n\nManager says: ${text}` }] }]
+                };
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    throw new Error("HTTP error " + res.status);
+                }
+
+                const data = await res.json();
+                const reply = data.candidates[0].content.parts[0].text;
+
+                // Parse markdown bold **text** to <strong>
+                const formattedReply = reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                appendAIMessage(formattedReply, 'ai');
+
+            } catch (err) {
+                console.error(err);
+                appendAIMessage("System: Error connecting to AI. Please verify your API Key is correct.", 'system');
+            } finally {
+                sendBtn.innerText = 'SEND';
+                sendBtn.disabled = false;
+            }
+        }
+
         fetchData();
         setInterval(fetchData, 60000);
     </script>
@@ -690,6 +911,53 @@
                 <button class="btn-gold"
                     style="flex:1; background:var(--forest); border-color:var(--forest); color:white;"
                     onclick="executeRouteReport()">GENERATE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assist Floating Button -->
+    <button onclick="toggleAIModal()"
+        style="position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: #3b82f6; color: white; border: none; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5); font-size: 1.8rem; cursor: pointer; z-index: 9000; display:flex; justify-content:center; align-items:center; transition: transform 0.2s;">
+        🧠
+    </button>
+
+    <!-- AI Chat Modal -->
+    <div id="ai-modal" class="hidden"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center;">
+        <div
+            style="position:relative; background: #0f172a; padding: 0; border-radius:1rem; border:1px solid #334155; width:90%; max-width:500px; height: 80vh; max-height: 600px; display:flex; flex-direction:column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <!-- Header -->
+            <div
+                style="background: #1e293b; padding: 1rem 1.5rem; border-top-left-radius: 1rem; border-top-right-radius: 1rem; border-bottom: 1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:#3b82f6; display:flex; align-items:center; gap: 10px; font-weight: 900;">🧠
+                    AI Campaign Assistant</h3>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <button onclick="setAIKey()"
+                        style="background: transparent; border: 1px solid var(--muted); color: var(--muted); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">Set
+                        API Key</button>
+                    <button onclick="toggleAIModal()"
+                        style="background:none; border:none; color:#ef4444; font-size:2rem; cursor:pointer; line-height: 1;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Chat Body -->
+            <div id="ai-chat-body"
+                style="flex:1; padding: 1.5rem; overflow-y:auto; display:flex; flex-direction:column; gap: 1rem;">
+                <div
+                    style="background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 0.5rem; align-self: flex-start; max-width: 85%; border: 1px solid #334155; font-size: 0.9rem; line-height: 1.5;">
+                    Hello Manager! I am hard-wired into your Command Center. Once your API key is set, I run purely from
+                    your browser without requiring any login. How can I assist you with the campaign?
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div
+                style="padding: 1rem; border-top: 1px solid #334155; background: #1e293b; border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; display:flex; gap: 10px;">
+                <input type="text" id="ai-input" placeholder="Ask AI a question..."
+                    onkeypress="if(event.key === 'Enter') sendAIMessage()"
+                    style="flex:1; padding: 0.8rem; border-radius: 0.5rem; border: 1px solid #334155; background: #0f172a; color: white;">
+                <button id="ai-send-btn" onclick="sendAIMessage()"
+                    style="background: #3b82f6; color: white; border: none; padding: 0 1.5rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer; text-transform: uppercase;">Send</button>
             </div>
         </div>
     </div>
