@@ -850,24 +850,33 @@
             const flat = masterData.flat || [];
             const unvisited = flat.filter(v => (cloudResults[v.Address] || 'UNVISITED') === 'UNVISITED');
 
-            let streetStats = {};
+            let allStreets = {};
             unvisited.forEach(v => {
                 const c = (v.City || 'Unknown').trim().toUpperCase();
                 const s = (v.Street || 'Unknown').trim().toUpperCase();
                 const d = (v.District || 'Unknown').trim().toUpperCase();
-                const key = `${s} (${c}) [Pct ${d}]`;
-                streetStats[key] = (streetStats[key] || 0) + 1;
+                const key = `${c}|${d}|${s}`;
+                allStreets[key] = (allStreets[key] || 0) + 1;
             });
 
-            // Avoid token limits by only sending top 150 streets
-            const sortedStreets = Object.entries(streetStats)
+            // Sort by count and keep top 150 elements to avoid token limit
+            const sortedArray = Object.entries(allStreets)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 150);
 
-            let contextData = "Top 150 Streets with most unvisited targets:\n";
-            sortedStreets.forEach(([street, count]) => {
-                contextData += `- ${street}: ${count} homes left\n`;
+            // Re-group by city for the prompt
+            let cityGroups = {};
+            sortedArray.forEach(([key, count]) => {
+                const [c, d, s] = key.split('|');
+                if (!cityGroups[c]) cityGroups[c] = [];
+                cityGroups[c].push(`  - Precinct ${d} -> ${s}: ${count} homes left`);
             });
+
+            let contextData = "Data Context for largest streets (grouped by CITY):\n";
+            for (let c in cityGroups) {
+                contextData += `[CITY: ${c}]\n`;
+                contextData += cityGroups[c].join('\n') + '\n';
+            }
 
             const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.
 Data Context for largest streets:
