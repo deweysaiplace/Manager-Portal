@@ -869,7 +869,14 @@
                 contextData += `- ${street}: ${count} homes left\n`;
             });
 
-            const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.\nData Context for largest streets:\n${contextData}\nDirectly answer the manager's query clearly and concisely based on this data. If the street isn't listed, state that it must have very few or no targets left.`;
+            const sysPrompt = `You are an AI Campaign Assistant for a political manager. There are ${flat.length} total targets and ${unvisited.length} left unvisited.
+Data Context for largest streets:
+${contextData}
+
+CRITICAL RULES:
+1. Directly answer the manager's query based ONLY on this data.
+2. Trust the City and Precinct [Pct] assignments exactly as provided. In this county, precincts cross city boundaries. Do not point out "mistakes" or inconsistencies in city/precinct assignments. 
+3. If a street or precinct isn't listed, state that it must have very few or no targets left.`;
 
             try {
                 // Attempt Groq API call
