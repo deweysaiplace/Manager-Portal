@@ -854,7 +854,8 @@
             unvisited.forEach(v => {
                 const c = (v.City || 'Unknown').trim().toUpperCase();
                 const s = (v.Street || 'Unknown').trim().toUpperCase();
-                const key = `${s} (${c})`;
+                const d = (v.District || 'Unknown').trim().toUpperCase();
+                const key = `${s} (${c}) [Pct ${d}]`;
                 streetStats[key] = (streetStats[key] || 0) + 1;
             });
 
